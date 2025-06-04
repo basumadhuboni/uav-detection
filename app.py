@@ -7,7 +7,6 @@ import subprocess
 import os
 import uuid
 import shutil
-import gdown
 
 # Set page config
 st.set_page_config(
@@ -51,14 +50,6 @@ def is_valid_video(file):
 # Create directories if they don’t exist
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('outputs', exist_ok=True)
-os.makedirs('weights', exist_ok=True)
-
-# Download YOLOv5 weights if not present
-weights_path = os.path.join('weights', 'best.pt')
-if not os.path.exists(weights_path):
-    st.info("Downloading model weights...")
-    gdrive_url = "https://drive.google.com/uc?id=1XcwJhUf5_5BVwKTBXMiFs2KF44I42oIi"
-    gdown.download(gdrive_url, weights_path, quiet=False)
 
 # File uploader
 uploaded_file = st.file_uploader(
@@ -86,11 +77,12 @@ if uploaded_file is not None:
                 with st.spinner('Processing video...'):
                     # Define paths
                     current_dir = os.getcwd()
+                    weights_path = os.path.join(current_dir, 'weights', 'best.pt')
                     output_project = os.path.join(current_dir, 'outputs')
 
                     # Run YOLOv5 detection
                     command = [
-                        'python3', 'yolov5/detect.py',
+                        'python3', 'yolov5/detect.py',  # Use python3 instead of python
                         '--weights', weights_path,
                         '--img', '640',
                         '--conf', '0.4',
@@ -99,7 +91,7 @@ if uploaded_file is not None:
                         '--name', unique_id,
                         '--exist-ok'
                     ]
-                    subprocess.run(command, check=True)
+                    subprocess.run(command, check=True)  # Run in current directory
 
                     # Define output video path
                     output_video_path = os.path.join('outputs', unique_id, video_filename)
@@ -115,10 +107,6 @@ if uploaded_file is not None:
                             )
                         # Optionally display the output video
                         st.video(output_video_path)
-
-                        # Clean up temporary files
-                        shutil.rmtree(os.path.join('uploads', unique_id), ignore_errors=True)
-                        shutil.rmtree(os.path.join('outputs', unique_id), ignore_errors=True)
                     else:
                         st.error("Output video not found. Processing may have failed.")
 

@@ -1,6 +1,5 @@
 uploads/
 outputs/
-weights/best.pt
 yolov5/.git/
 __pycache__/
 *.pyc
