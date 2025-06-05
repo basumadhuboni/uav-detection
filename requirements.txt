@@ -51,4 +51,4 @@ streamlit
 opencv-python-headless
 pillow
 numpy
-
+norfair
