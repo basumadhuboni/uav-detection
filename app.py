@@ -66,6 +66,87 @@ def is_valid_video(file):
     mime_type = mimetypes.guess_type(file.name)[0]
     return mime_type is not None and mime_type.startswith('video/')
 
+def analyze_trajectory(trajectories, fps):
+    """
+    Analyze the drone trajectory to determine if the behavior is suspicious based on sharp turns and speed variability.
+    Returns a tuple: (flight_pattern, behavior_classification, confidence_score)
+    """
+    if not trajectories:
+        return "Unknown", "Unknown", 0
+
+    # For simplicity, assume only one drone (first track_id)
+    track_id = list(trajectories.keys())[0]
+    points = trajectories[track_id]
+    
+    if len(points) < 3:
+        return "Unknown", "Unknown", 0
+
+    # 1. Calculate number of sharp turns (direction changes > 90 degrees)
+    sharp_turns = 0
+    for i in range(2, len(points)):
+        # Get three consecutive points to compute the angle
+        p1 = np.array(points[i-2])
+        p2 = np.array(points[i-1])
+        p3 = np.array(points[i])
+        
+        # Vectors
+        v1 = p2 - p1  # Vector from p1 to p2
+        v2 = p3 - p2  # Vector from p2 to p3
+        
+        # Compute the angle between vectors using dot product
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+        if norm_v1 == 0 or norm_v2 == 0:
+            continue
+        
+        cos_angle = np.dot(v1, v2) / (norm_v1 * norm_v2)
+        cos_angle = np.clip(cos_angle, -1.0, 1.0)  # Avoid numerical errors
+        angle = np.degrees(np.arccos(cos_angle))
+        
+        # Consider it a sharp turn if angle > 90 degrees
+        if angle > 90:
+            sharp_turns += 1
+
+    # 2. Calculate speed variability
+    speeds = []
+    for i in range(1, len(points)):
+        # Distance between consecutive points
+        p1 = np.array(points[i-1])
+        p2 = np.array(points[i])
+        distance = np.linalg.norm(p2 - p1)
+        
+        # Time interval between frames (in seconds) = 1/fps
+        time_interval = 1.0 / fps
+        
+        # Speed = distance / time (pixels per second)
+        speed = distance / time_interval
+        speeds.append(speed)
+    
+    # Compute speed variance
+    if len(speeds) > 1:
+        speed_variance = np.var(speeds)
+        mean_speed = np.mean(speeds)
+        # Normalize variance relative to mean speed to get a coefficient of variation
+        speed_cv = (speed_variance ** 0.5) / mean_speed if mean_speed > 0 else 0
+    else:
+        speed_cv = 0
+
+    # 3. Classify behavior based on rules
+    # - More than 3 sharp turns indicates suspicious movement
+    # - High speed variability (coefficient of variation > 0.5) indicates suspicious behavior
+    suspicious_score = 0
+    if sharp_turns > 3:
+        suspicious_score += 40  # Sharp turns contribute to suspiciousness
+    if speed_cv > 0.5:
+        suspicious_score += 40  # High speed variability contributes to suspiciousness
+
+    # Determine flight pattern and behavior
+    flight_pattern = "Suspicious" if sharp_turns > 3 or speed_cv > 0.5 else "Normal"
+    behavior_classification = "Threatening" if suspicious_score >= 60 else "Non-threatening"
+    confidence_score = min(suspicious_score + 20, 100)  # Base confidence + bonus for clarity
+
+    return flight_pattern, behavior_classification, confidence_score
+
 # Create directories if they don’t exist
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('outputs', exist_ok=True)
@@ -186,6 +267,14 @@ if st.session_state.uploaded_file is not None:
                     cap.release()
                     out.release()
 
+                    # Analyze the trajectory
+                    flight_pattern, behavior_classification, confidence_score = analyze_trajectory(trajectories, fps)
+
+                    # Store analysis results in session state
+                    st.session_state.flight_pattern = flight_pattern
+                    st.session_state.behavior_classification = behavior_classification
+                    st.session_state.confidence_score = confidence_score
+
                 # Mark analysis as done
                 st.session_state.analysis_done = True
 
@@ -218,11 +307,11 @@ if st.session_state.uploaded_file is not None:
                 # Display analysis results
                 st.subheader("Analysis Results")
                 with st.expander("View Detailed Analysis", expanded=True):
-                    st.markdown('''
+                    st.markdown(f'''
                     🔍 **Analysis Results:**
-                    - Flight Pattern: Suspicious
-                    - Behavior Classification: threatening
-                    - Confidence Score: 82%
+                    - Flight Pattern: {st.session_state.flight_pattern}
+                    - Behavior Classification: {st.session_state.behavior_classification}
+                    - Confidence Score: {st.session_state.confidence_score}%
                     ''')
 
         except Exception as e:
