@@ -124,7 +124,7 @@ if uploaded_file is not None:
                     out = cv2.VideoWriter(trajectory_output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
                     # Initialize Norfair tracker
-                    tracker = Tracker(distance_function='euclidean', distance_threshold=50)
+                    tracker = Tracker(distance_function='mean_euclidean', distance_threshold=50)
 
                     # Initialize trajectories dictionary
                     trajectories = {}
