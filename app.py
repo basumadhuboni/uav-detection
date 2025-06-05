@@ -10,6 +10,7 @@ import shutil
 import sys
 import torch
 from norfair import Detection, Tracker, draw_tracked_objects
+from io import BytesIO
 
 # Set page config
 st.set_page_config(
@@ -39,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Title and description
-st.title('🛸 UAV Detection System')
+st.title('🛸 UAV Behaviour Detection System')
 st.markdown('''
 ### Upload a video to detect and analyze drone activity
 ''')
@@ -157,6 +158,25 @@ uploaded_file = st.file_uploader(
     type=['mp4', 'avi', 'mov', 'mkv'],
     help="Upload a video file (MP4, AVI, MOV, or MKV format)"
 )
+
+# Add button to use sample video
+sample_video_path = os.path.join(os.getcwd(), 'drone_flying.mp4')
+if os.path.exists(sample_video_path):
+    if st.button('Use Sample Video (drone_flying.mp4)', key='use_sample'):
+        with open(sample_video_path, 'rb') as f:
+            sample_video_bytes = f.read()
+        # Create a file-like object for Streamlit to treat as an uploaded file
+        sample_file = BytesIO(sample_video_bytes)
+        sample_file.name = 'drone_flying.mp4'  # Set the name attribute to mimic an uploaded file
+        st.session_state.uploaded_file = sample_file
+        st.session_state.analysis_done = False
+        st.session_state.unique_id = None
+        st.session_state.video_filename = None
+        st.session_state.video_path = None
+        st.session_state.output_video_path = None
+        st.session_state.trajectory_output_path = None
+else:
+    st.warning("Sample video (drone_flying.mp4) not found in the root directory.")
 
 # Handle file upload
 if uploaded_file is not None and uploaded_file != st.session_state.uploaded_file:
