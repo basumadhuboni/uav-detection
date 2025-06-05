@@ -44,6 +44,22 @@ st.markdown('''
 ### Upload a video to detect and analyze drone activity
 ''')
 
+# Initialize session state
+if 'uploaded_file' not in st.session_state:
+    st.session_state.uploaded_file = None
+if 'analysis_done' not in st.session_state:
+    st.session_state.analysis_done = False
+if 'unique_id' not in st.session_state:
+    st.session_state.unique_id = None
+if 'video_filename' not in st.session_state:
+    st.session_state.video_filename = None
+if 'video_path' not in st.session_state:
+    st.session_state.video_path = None
+if 'output_video_path' not in st.session_state:
+    st.session_state.output_video_path = None
+if 'trajectory_output_path' not in st.session_state:
+    st.session_state.trajectory_output_path = None
+
 def is_valid_video(file):
     if file is None:
         return False
@@ -61,22 +77,35 @@ uploaded_file = st.file_uploader(
     help="Upload a video file (MP4, AVI, MOV, or MKV format)"
 )
 
-if uploaded_file is not None:
-    if is_valid_video(uploaded_file):
+# Handle file upload
+if uploaded_file is not None and uploaded_file != st.session_state.uploaded_file:
+    # Reset session state when a new file is uploaded
+    st.session_state.uploaded_file = uploaded_file
+    st.session_state.analysis_done = False
+    st.session_state.unique_id = None
+    st.session_state.video_filename = None
+    st.session_state.video_path = None
+    st.session_state.output_video_path = None
+    st.session_state.trajectory_output_path = None
+
+# Process uploaded file if present in session state
+if st.session_state.uploaded_file is not None:
+    if is_valid_video(st.session_state.uploaded_file):
         try:
-            # Generate a unique ID for this upload
-            unique_id = str(uuid.uuid4())
-            video_filename = f"{unique_id}.mp4"
-            video_path = os.path.join('uploads', video_filename)
+            # Generate a unique ID and paths if not already set
+            if st.session_state.unique_id is None:
+                st.session_state.unique_id = str(uuid.uuid4())
+                st.session_state.video_filename = f"{st.session_state.unique_id}.mp4"
+                st.session_state.video_path = os.path.join('uploads', st.session_state.video_filename)
 
-            # Save the uploaded video
-            with open(video_path, 'wb') as f:
-                f.write(uploaded_file.getvalue())
+                # Save the uploaded video
+                with open(st.session_state.video_path, 'wb') as f:
+                    f.write(st.session_state.uploaded_file.getvalue())
 
-            st.success(f"Video uploaded successfully: {uploaded_file.name}")
+            st.success(f"Video uploaded successfully: {st.session_state.uploaded_file.name}")
 
             # Analyze button
-            if st.button('🔍 Analyze Video', key='analyze'):
+            if not st.session_state.analysis_done and st.button('🔍 Analyze Video', key='analyze'):
                 with st.spinner('Processing video for detection...'):
                     # Define paths
                     current_dir = os.getcwd()
@@ -89,39 +118,27 @@ if uploaded_file is not None:
                         '--weights', weights_path,
                         '--img', '640',
                         '--conf', '0.4',
-                        '--source', video_path,
+                        '--source', st.session_state.video_path,
                         '--project', output_project,
-                        '--name', unique_id,
+                        '--name', st.session_state.unique_id,
                         '--exist-ok'
                     ]
                     subprocess.run(command, check=True, cwd=current_dir)
 
                     # Define output video path for detection
-                    output_video_path = os.path.join('outputs', unique_id, video_filename)
-
-                    # Check if output video exists and provide download
-                    if os.path.exists(output_video_path):
-                        with open(output_video_path, 'rb') as f:
-                            st.download_button(
-                                label="⬇️ Download detection output video",
-                                data=f,
-                                file_name="detection_output.mp4",
-                                mime="video/mp4"
-                            )
-                    else:
-                        st.error("Detection output video not found. Processing may have failed.")
+                    st.session_state.output_video_path = os.path.join('outputs', st.session_state.unique_id, st.session_state.video_filename)
 
                 with st.spinner('Processing video for trajectory tracing...'):
                     # Load YOLOv5 model
                     model = torch.hub.load('ultralytics/yolov5', 'custom', path=weights_path)
 
                     # Set up video capture and output for trajectory tracing
-                    cap = cv2.VideoCapture(video_path)
+                    cap = cv2.VideoCapture(st.session_state.video_path)
                     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fps = cap.get(cv2.CAP_PROP_FPS)
-                    trajectory_output_path = os.path.join('outputs', unique_id, f"trajectory_{video_filename}")
-                    out = cv2.VideoWriter(trajectory_output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+                    st.session_state.trajectory_output_path = os.path.join('outputs', st.session_state.unique_id, f"trajectory_{st.session_state.video_filename}")
+                    out = cv2.VideoWriter(st.session_state.trajectory_output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
                     # Initialize Norfair tracker
                     tracker = Tracker(distance_function='mean_euclidean', distance_threshold=50)
@@ -169,19 +186,36 @@ if uploaded_file is not None:
                     cap.release()
                     out.release()
 
-                    # Provide download button for trajectory output video
-                    if os.path.exists(trajectory_output_path):
-                        with open(trajectory_output_path, 'rb') as f:
-                            st.download_button(
-                                label="⬇️ Download trajectory output video",
-                                data=f,
-                                file_name="trajectory_output.mp4",
-                                mime="video/mp4"
-                            )
-                    else:
-                        st.error("Trajectory output video not found. Processing may have failed.")
+                # Mark analysis as done
+                st.session_state.analysis_done = True
 
-                # Display placeholder analysis results
+            # Display download buttons if analysis is done
+            if st.session_state.analysis_done:
+                # Detection output download button
+                if st.session_state.output_video_path and os.path.exists(st.session_state.output_video_path):
+                    with open(st.session_state.output_video_path, 'rb') as f:
+                        st.download_button(
+                            label="⬇️ Download detection output video",
+                            data=f,
+                            file_name="detection_output.mp4",
+                            mime="video/mp4"
+                        )
+                else:
+                    st.error("Detection output video not found. Processing may have failed.")
+
+                # Trajectory output download button
+                if st.session_state.trajectory_output_path and os.path.exists(st.session_state.trajectory_output_path):
+                    with open(st.session_state.trajectory_output_path, 'rb') as f:
+                        st.download_button(
+                            label="⬇️ Download trajectory output video",
+                            data=f,
+                            file_name="trajectory_output.mp4",
+                            mime="video/mp4"
+                        )
+                else:
+                    st.error("Trajectory output video not found. Processing may have failed.")
+
+                # Display analysis results
                 st.subheader("Analysis Results")
                 with st.expander("View Detailed Analysis", expanded=True):
                     st.markdown('''
