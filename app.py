@@ -7,6 +7,7 @@ import subprocess
 import os
 import uuid
 import shutil
+import sys
 
 # Set page config
 st.set_page_config(
@@ -80,9 +81,9 @@ if uploaded_file is not None:
                     weights_path = os.path.join(current_dir, 'weights', 'best.pt')
                     output_project = os.path.join(current_dir, 'outputs')
 
-                    # Run YOLOv5 detection
+                    # Run YOLOv5 detection using the same Python interpreter
                     command = [
-                        'python3', 'yolov5/detect.py',  # Use python3 instead of python
+                        sys.executable, 'yolov5/detect.py',  # Use sys.executable instead of 'python3'
                         '--weights', weights_path,
                         '--img', '640',
                         '--conf', '0.4',
@@ -91,7 +92,7 @@ if uploaded_file is not None:
                         '--name', unique_id,
                         '--exist-ok'
                     ]
-                    subprocess.run(command, check=True)  # Run in current directory
+                    subprocess.run(command, check=True, cwd=current_dir)  # Explicitly set working directory
 
                     # Define output video path
                     output_video_path = os.path.join('outputs', unique_id, video_filename)
