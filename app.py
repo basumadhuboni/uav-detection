@@ -13,7 +13,7 @@ from norfair import Detection, Tracker, draw_tracked_objects
 
 # Set page config
 st.set_page_config(
-    page_title="UAV Detection System",
+    page_title="UAV Behaviour Detection System",
     page_icon="✈️",
     layout="wide"
 )
