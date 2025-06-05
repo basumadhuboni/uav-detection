@@ -1,5 +1,4 @@
 uploads/
 outputs/
-yolov5/.git/
 __pycache__/
 *.pyc
