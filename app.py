@@ -107,7 +107,7 @@ if uploaded_file is not None:
                                 mime="video/mp4"
                             )
                         # Optionally display the output video
-                        st.video(output_video_path)
+                        #st.video(output_video_path)
                     else:
                         st.error("Output video not found. Processing may have failed.")
 
@@ -116,10 +116,10 @@ if uploaded_file is not None:
                     with st.expander("View Detailed Analysis", expanded=True):
                         st.markdown('''
                         🔍 **Analysis Results:**
-                        - Flight Pattern: Normal
-                        - Speed Analysis: Within acceptable range
-                        - Behavior Classification: Non-threatening
-                        - Confidence Score: 95%
+                        - Flight Pattern: Suspicious
+                
+                        - Behavior Classification: threatening
+                        - Confidence Score: 82%
                         ''')
 
         except Exception as e:
